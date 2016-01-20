@@ -2,17 +2,7 @@
 #-Delete Half : Give negatives to each axis
 #-Make reinitter, unwrapper and image saver allpy for all selected objects, not only active.
 
-bl_info = {
-"name": "Omni-Tools",
-"author": "Highstaker a.k.a. OmniSable",
-"version": (1, 0),
-"blender": (2, 74, 0),
-"location": "View3D > Tool Shelf > Omni-Tools Tab",
-"description": "A set of my tools to boost the workflow",
-"warning": "",
-"wiki_url": "",
-"category": "3D View",
-}
+
 
 # import the basic library
 import bpy
@@ -36,50 +26,6 @@ def getSelectedMeshObjects():
     """
     return [i for i in bpy.context.scene.objects if i.select and i.type == 'MESH']
 
-# main class of this toolbar
-class VIEW3D_PT_OmniTools(bpy.types.Panel):
-    bl_category = "OmniTools"
-    bl_space_type = "VIEW_3D"
-    bl_region_type = "TOOLS"
-    bl_label = "OmniTools"
-
-    def draw(self, context):
-        layout = self.layout
-        view = context.space_data
-
-        col = layout.column(align=True)
-        col.operator("view3d.unwrap_per_material",text="Unwrap per material")
-
-        col = layout.column(align=True)
-        col.operator("view3d.next_material_select",text="Next Material Verticies")
-        col.operator("view3d.this_material_select",text="Current Material Verticies")
-        col.operator("view3d.previous_material_select",text="Previous Material Verticies")
-
-        col = layout.column(align=True)
-        col.operator("view3d.select_half",text="Select Half")
-
-        col = layout.column(align=True)
-        col.operator("view3d.reinit_images",text="Reinitialize images")
-
-        col = layout.column(align=True)
-        col.operator("view3d.save_baked_images",text="Save baked images")
-
-        col = layout.column(align=True)
-        col.operator("view3d.fake_backup_mesh",text="Backup mesh")
-
-        col = layout.column(align=True)
-        # col.operator_menu_enum("view3d.replace_data_by_active", "obj_name", text="some menu")
-        col.operator("view3d.make_single_user",text="Make mesh single-user")
-        col.operator("view3d.replace_data_by_active",text="Replace data by active")
-
-        col = layout.column(align=True)
-        col.operator("view3d.dae_export_selected_per_scene",text="Export selected to Collada per scene")
-
-        col = layout.column(align=True)
-        col.operator("view3d.array_rotation_jitter",text="Jittered array")
-
-        col = layout.column(align=True)
-        col.operator("view3d.move_pivot",text="Move Pivot")
 
 
 class VIEW3D_OT_unwrap(bpy.types.Operator):
@@ -88,7 +34,6 @@ class VIEW3D_OT_unwrap(bpy.types.Operator):
     bl_description = "Selects each material one by one and makes a UV-unwrap on per-material basis"
 
     def execute(self, context):
-
         bpy.ops.object.mode_set(mode="EDIT")
         bpy.context.tool_settings.mesh_select_mode = (False , False , True) #vert, edge, face
         for i in range(len(bpy.context.object.material_slots)):
@@ -242,10 +187,11 @@ class VIEW3D_OT_fake_backup_mesh(bpy.types.Operator):
     bl_description = "Backups mesh, creating a fake user."
 
     def execute(self, context):
+        cur_mode = bpy.context.active_object.mode
 
         bpy.ops.object.mode_set(mode="OBJECT")
 
-        orig_mesh = bpy.context.scene.objects.active.data
+        orig_mesh = bpy.context.active_object.data
 
         NAME = orig_mesh.name
 
@@ -253,8 +199,8 @@ class VIEW3D_OT_fake_backup_mesh(bpy.types.Operator):
         bak_mesh.name = NAME + "_old"
 
         bak_mesh.use_fake_user = True
-
-        bpy.ops.object.mode_set(mode="EDIT")
+ 
+        bpy.ops.object.mode_set(mode=cur_mode)
 
         return {'FINISHED'}
 
@@ -380,20 +326,13 @@ class VIEW3D_OT_move_pivot(bpy.types.Operator):
         scene = context.scene
         cursor = scene.cursor_location
         obj = scene.objects.active
-        mesh = bpy.context.selected_objects[0].data
+        mesh = bpy.context.active_object.data
+
+        bpy.ops.object.mode_set(mode="OBJECT")  # it doesn't work in EDIT mode!
+
         for vertex in mesh.vertices:
             vertex.co -= self.pivot_offset
 
         obj.location += vectorMultiply(self.pivot_offset, obj.scale)
 
         return {'FINISHED'}            # this lets blender know the operator finished successfully.
-
-# register the class
-def register():
-    bpy.utils.register_module(__name__)
-
-def unregister():
-    bpy.utils.unregister_module(__name__)
-
-if __name__ == "__main__":
-    register()
