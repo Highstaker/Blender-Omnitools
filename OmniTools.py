@@ -114,7 +114,6 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 	axes_menu_items = (("x", "X", "", 0),("y", "Y", "", 1),("z", "Z", "", 2),)
 
 	vertex_group_name = bpy.props.StringProperty(name="Vertex Group Name")
-	# axis = bpy.props.BoolVectorProperty(name="Axis",subtype="XYZ",description="",default=(True,False,False))
 	axis = bpy.props.EnumProperty(items=axes_menu_items,name="Axxis",description="")
 	negative = bpy.props.BoolProperty(name="Negative",subtype="NONE",description="Copy from negative to positive side if checked. If unchecked - from positive to negative")
 	margin = bpy.props.FloatProperty(name="Margin",unit="LENGTH",subtype="NONE", soft_min=0, step=0.00001*100,description="", default=0.00001, precision=6)
@@ -125,15 +124,10 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 		vertex_group = active_obj.vertex_groups[0] # should be selectable
 		axis_index = "xyz".index(self.axis)
 
-		# if True not in self.axis:
-		# 	#there must be an axis to operate on. If none is chosen, choose X
-		# 	self.axis = (True,False,False)
-
 		def symmetricals(a,b):
 			"""
 			Checks whether the vertices are symmetrical along given axis or not.
 			"""
-			# print("self.margin",self.margin)#debug
 			result = []
 			for ax in range(3):
 				if ax == axis_index:
@@ -143,28 +137,19 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 
 			return all(result)
 
-		# #iterate over all axes
-		# for axis_index, axis_flag in enumerate(self.axis):
-		# 	#if axis is active
-		# 	if axis_flag:
-
 		positives = []
 		negatives = []
 
 		for vert in data.vertices:
-			# print("vert.index",vert.index)#debug
-			# print("vert.co",vert.co)#debug
 			vert_coords = vert.co.to_tuple()
-
 			if self.negative:
+				# negative (from -X to +X)
 				if vert_coords[axis_index] < 0:
+					# weights are copied FROM these
 					try:
 						vert_weight = vertex_group.weight(vert.index)
-						# print("negative vert_index",vert.index)#debug
 					except RuntimeError:
 						continue
-
-					# print("positives",positives)#debug
 					# look for symmetrical vertex among saved ones
 					for n, other_vert_index in enumerate(positives):
 						other_vert_coords = data.vertices[other_vert_index].co.to_tuple()
@@ -174,13 +159,9 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 							break
 					else:
 						negatives.append(vert.index)
-
-
 				elif vert_coords[axis_index] > 0:
-					# print("negatives",negatives)#debug
-
+					# weights are copied TO these
 					for n, other_vert_index in enumerate(negatives):
-						# print("other_vert_index",other_vert_index)#debug
 						other_vert_coords = data.vertices[other_vert_index].co.to_tuple()
 						if symmetricals(other_vert_coords, vert_coords):
 							vert_weight = vertex_group.weight(other_vert_index)
@@ -190,17 +171,14 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 					else:
 						vertex_group.add((vert.index,), 0.0, "REPLACE")
 						positives.append(vert.index)
-
-
 			else:
-				#not negative
+				# positive (from +X to -X)
 				if vert_coords[axis_index] > 0:
+					# weights are copied FROM these
 					try:
 						vert_weight = vertex_group.weight(vert.index)
-						# print("negative vert_index",vert.index)#debug
 					except RuntimeError:
 						continue
-
 					# look for symmetrical vertex among saved ones
 					for n, other_vert_index in enumerate(negatives):
 						other_vert_coords = data.vertices[other_vert_index].co.to_tuple()
@@ -210,8 +188,8 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 							break
 					else:
 						positives.append(vert.index)
-
 				elif vert_coords[axis_index] < 0:
+					# weights are copied TO these
 					for n, other_vert_index in enumerate(positives):
 						other_vert_coords = data.vertices[other_vert_index].co.to_tuple()
 						if symmetricals(other_vert_coords, vert_coords):
@@ -223,60 +201,6 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 						vertex_group.add((vert.index,), 0.0, "REPLACE")
 						negatives.append(vert.index)
 
-
-
-
-
-
-
-
-					# if vert_coords[axis_index] > 0:
-					# 	if not self.negative:
-					# 		#check if the vertex actually has weight. If not, skip
-					# 		try:
-					# 			vert_weight = vertex_group.weight(vert.index)
-					# 			print("positive vert_index",vert.index)#debug
-					# 		except RuntimeError:
-					# 			continue
-
-					# 	# look for symmetrical vertex among saved ones
-					# 	for other_vert_index in negatives:
-					# 		other_vert_coords = data.vertices[other_vert_index].co.to_tuple()
-					# 		if symmetricals(other_vert_coords, vert_coords, axis_index):
-					# 			if not self.negative:
-					# 				vertex_group.add((other_vert_index,), vert_weight, "REPLACE")
-					# 				break
-
-					# 	else:
-					# 		# save the index
-					# 		positives.append(vert.index)
-
-
-					# elif vert.co[axis_index] < 0:
-					# 	if self.negative:
-					# 		#check if the vertex actually has weight. If not, skip
-					# 		try:
-					# 			vert_weight = vertex_group.weight(vert.index)
-					# 			print("negative vert_index",vert.index)#debug
-					# 		except RuntimeError:
-					# 			continue
-
-					# 	# look for symmetrical vertex among saved ones
-					# 	for other_vert_index in positives:
-					# 		other_vert_coords = data.vertices[other_vert_index].co.to_tuple()
-
-					# 		if symmetricals(other_vert_coords, vert_coords, axis_index):
-					# 			if self.negative:
-					# 				vertex_group.add((other_vert_index,), vert_weight, "REPLACE")
-					# 				break
-
-					# 	else:
-					# 		# save the index
-					# 		negatives.append(vert.index)
-
-
-		print("self.axis",self.axis, type(self.axis))#debug
-				
 		return {'FINISHED'}
 
 class VIEW3D_OT_select_half(bpy.types.Operator):
