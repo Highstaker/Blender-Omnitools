@@ -6,6 +6,7 @@ from mathutils import Vector
 from .utils import vectorMultiply, getSelectedMeshObjects, selectActiveMaterialOnly, selectNeighbourMaterial
 
 #works
+#TODO: Add more unwrap modes and options
 class VIEW3D_OT_unwrap(bpy.types.Operator):
 	bl_label = "Unwrap Materials Separately"
 	bl_idname = "view3d.unwrap_per_material"
@@ -73,11 +74,11 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 
 	axes_menu_items = (("x", "X", "", 0), ("y", "Y", "", 1), ("z", "Z", "", 2),)
 
-	axis = bpy.props.EnumProperty(items=axes_menu_items, name="Axis", description="")
+	axis = bpy.props.EnumProperty(items=axes_menu_items, name="Axis", description="Axis of symmetry")
 	negative = bpy.props.BoolProperty(name="Negative", subtype="NONE",
 									  description="Copy from negative to positive side if checked. If unchecked - from positive to negative")
 	margin = bpy.props.FloatProperty(name="Margin", unit="LENGTH", subtype="NONE", soft_min=0, step=0.00001 * 100,
-									 description="", default=0.00001, precision=6)
+									 description="The coordinate of a vertex will be checked in the interval with width of 2*margin. Needed to avoid precision problems. Should be left at default value most of the time.", default=0.00001, precision=6)
 
 	def execute(self, context):
 		print("context.scene.processes", context.scene.processes)  # debug
@@ -178,10 +179,10 @@ class VIEW3D_OT_select_half(bpy.types.Operator):
 
 	margin = bpy.props.FloatProperty(name="Margin", unit="LENGTH", subtype="NONE",
 									 min=0.00001, step=0.001, precision=6,
-									description="")
-	axis = bpy.props.EnumProperty(items=axes_menu_items, name="Axis", description="")
-	negative = bpy.props.BoolProperty(name="Negative", subtype="NONE", description="")
-	deselect = bpy.props.BoolProperty(name="Deselect", subtype="NONE", description="")
+									description=" The coordinate of a vertex will be checked in the interval with width of 2*margin. Needed to avoid precision problems. Should be left at default value most of the time. ")
+	axis = bpy.props.EnumProperty(items=axes_menu_items, name="Axis", description="Axis of symmetry")
+	negative = bpy.props.BoolProperty(name="Negative", subtype="NONE", description="Select vertices on negative side of symmetry axis. If unchecked - on positive.")
+	deselect = bpy.props.BoolProperty(name="Deselect", subtype="NONE", description="If checked, deselects all previously selected vertices. If unchecked, appends selection.")
 
 	def execute(self, context):
 		active_obj = context.active_object
@@ -281,54 +282,35 @@ class VIEW3D_OT_make_single_user(bpy.types.Operator):
 
 		return {'FINISHED'}
 
-#TODO: deprecate, cuz Alt+C can do it
-class VIEW3D_OT_replace_data_by_active(bpy.types.Operator):
-	bl_label = "Replace data by active"
-	bl_idname = "view3d.replace_data_by_active"
-	bl_description = "Replaces the data in the objects that contain the data specified in the menu with the data in active object. Useful for applying changes to other meshes after using 'Make mesh single-user' and applying modifiers."
-	bl_options = {"REGISTER", "UNDO"}
 
-	def item_cb(self, context):
-		return [(ob.name, ob.name, ob.name) for ob in bpy.data.meshes]
-
-	mesh_name = bpy.props.EnumProperty(items=item_cb, name="Mesh Data", description="Mesh data to be replaced")
-
-	def execute(self, context):
-
-		mesh = self.mesh_name
-
-		print("Menu ", mesh)
-
-		scenes = bpy.data.scenes
-
-		for scene in scenes:
-			objects = scene.objects
-			for obj in objects:
-				if obj.data.name == mesh:
-					obj.data = bpy.context.scene.objects.active.data
-
-		bpy.ops.object.mode_set(mode="EDIT")
-		bpy.ops.object.mode_set(mode="OBJECT")
-
-		return {'FINISHED'}
-
-#TODO: needs upgrading!
+#works
 class VIEW3D_OT_dae_export_selected_per_scene(bpy.types.Operator):
 	bl_label = "Collada export selected per scene"
 	bl_idname = "view3d.dae_export_selected_per_scene"
 	bl_description = "Iterates over all scenes and exports meshes from each into a separate .dae file."
 
+	# filepath = bpy.props.StringProperty(subtype="FILE_PATH")
+	directory = bpy.props.StringProperty(subtype="DIR_PATH")
+
 	def execute(self, context):
-		EXPORT_FOLDER = 'dae_exports'
+		# print("filepath",self.filepath)#debug
+		print("directory",self.directory)#debug
+
+		# EXPORT_FOLDER = 'dae_exports'
 
 		for scene in bpy.data.scenes:
 			context.screen.scene = scene
-			filepath = os.path.dirname(bpy.data.filepath) + "/" + EXPORT_FOLDER + "/" + \
+			filepath = os.path.join(self.directory,
 					   os.path.splitext(bpy.path.basename(bpy.context.blend_data.filepath))[
-						   0] + "_" + scene.name + ".dae"
+						   0] + "_" + scene.name + ".dae")
 			bpy.ops.wm.collada_export(filepath=filepath, apply_modifiers=True, selected=True)
 
 		return {'FINISHED'}
+
+	def invoke(self, context, event):
+		wm = context.window_manager
+		wm.fileselect_add(self)
+		return {'RUNNING_MODAL'}
 
 #works
 class VIEW3D_OT_array_rotation_jitter(bpy.types.Operator):
@@ -378,7 +360,7 @@ class VIEW3D_OT_array_rotation_jitter(bpy.types.Operator):
 class VIEW3D_OT_move_pivot(bpy.types.Operator):
 	bl_idname = "view3d.move_pivot"  # unique identifier for buttons and menu items to reference.
 	bl_label = "Move Pivot"  # display name in the interface.
-	bl_description = "Moves the pivot point (origin) according to input"
+	bl_description = "Moves the pivot point (origin) according to input. Values are relative to object sizes, not world."
 	bl_options = {'REGISTER', 'UNDO'}  # enable undo for the operator.
 
 	pivot_offset = bpy.props.FloatVectorProperty(name="Pivot Offset",

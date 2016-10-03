@@ -5,7 +5,7 @@
 bl_info = {
 "name": "Omni-Tools",
 "author": "Highstaker a.k.a. Omni H. Sable",
-"version": (1, 1, 6),
+"version": (1, 1, 7),
 "blender": (2, 74, 0),
 "location": "View3D > Tool Shelf > Omni-Tools Tab",
 "description": "A set of my tools to boost the workflow",
@@ -69,9 +69,7 @@ class VIEW3D_PT_OmniTools(bpy.types.Panel):
 		col.operator("view3d.fake_backup_mesh",text="Backup mesh")
 
 		col = layout.column(align=True)
-		# col.operator_menu_enum("view3d.replace_data_by_active", "obj_name", text="some menu")
 		col.operator("view3d.make_single_user",text="Make mesh single-user")
-		# col.operator("view3d.replace_data_by_active",text="Replace data by active")#deprecated
 
 		box = layout.box()
 		label = box.label(text="Export tools",translate=False)
