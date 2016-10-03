@@ -113,16 +113,17 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 
 	axes_menu_items = (("x", "X", "", 0),("y", "Y", "", 1),("z", "Z", "", 2),)
 
-	vertex_group_name = bpy.props.StringProperty(name="Vertex Group Name")
 	axis = bpy.props.EnumProperty(items=axes_menu_items,name="Axxis",description="")
 	negative = bpy.props.BoolProperty(name="Negative",subtype="NONE",description="Copy from negative to positive side if checked. If unchecked - from positive to negative")
 	margin = bpy.props.FloatProperty(name="Margin",unit="LENGTH",subtype="NONE", soft_min=0, step=0.00001*100,description="", default=0.00001, precision=6)
 
 	def execute(self, context):
-		active_obj = bpy.context.scene.objects.active
+		active_obj = context.active_object
 		data = active_obj.data
-		vertex_group = active_obj.vertex_groups[0] # should be selectable
 		axis_index = "xyz".index(self.axis)
+
+		# get active vertex group
+		vertex_group = active_obj.vertex_groups.active
 
 		def symmetricals(a,b):
 			"""

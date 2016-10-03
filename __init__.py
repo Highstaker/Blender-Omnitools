@@ -5,7 +5,7 @@
 bl_info = {
 "name": "Omni-Tools",
 "author": "Highstaker a.k.a. Omni H. Sable",
-"version": (1, 1, 1),
+"version": (1, 1, 2),
 "blender": (2, 74, 0),
 "location": "View3D > Tool Shelf > Omni-Tools Tab",
 "description": "A set of my tools to boost the workflow",
@@ -63,7 +63,9 @@ class VIEW3D_PT_OmniTools(bpy.types.Panel):
 		col.operator("view3d.make_single_user",text="Make mesh single-user")
 		col.operator("view3d.replace_data_by_active",text="Replace data by active")
 
-		col = layout.column(align=True)
+		box = layout.box()
+		label = box.label(text="Export tools",translate=False)
+		col = box.column(align=True)
 		col.operator("view3d.dae_export_selected_per_scene",text="Export selected to Collada per scene")
 
 		col = layout.column(align=True)
@@ -75,10 +77,13 @@ class VIEW3D_PT_OmniTools(bpy.types.Panel):
 		col = layout.column(align=True)
 		col.operator("view3d.mirror_weights",text="Mirror Weights")
 
+		# col = layout.column(align=True)
+		# col.prop()
 
-#
-#    Registration
-#
+
+################
+### REGISTRATION
+################
 
 def register():
 	bpy.utils.register_module(__name__)
