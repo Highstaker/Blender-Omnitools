@@ -5,7 +5,7 @@
 bl_info = {
 "name": "Omni-Tools",
 "author": "Highstaker a.k.a. Omni H. Sable",
-"version": (1, 1, 2),
+"version": (1, 1, 3),
 "blender": (2, 74, 0),
 "location": "View3D > Tool Shelf > Omni-Tools Tab",
 "description": "A set of my tools to boost the workflow",
@@ -27,6 +27,9 @@ else:
 import bpy
 from bpy.props import *
 
+PROCESSES = 4
+bpy.types.Scene.processes = IntProperty(name="Processes", description="", min=PROCESSES, )
+
 # main class of this toolbar
 class VIEW3D_PT_OmniTools(bpy.types.Panel):
 	bl_category = "OmniTools"
@@ -37,6 +40,9 @@ class VIEW3D_PT_OmniTools(bpy.types.Panel):
 	def draw(self, context):
 		layout = self.layout
 		view = context.space_data
+
+		col = layout.column(align=True)
+		layout.prop(data=context.scene, property='processes')
 
 		col = layout.column(align=True)
 		col.operator("view3d.unwrap_per_material",text="Unwrap per material")
@@ -77,8 +83,7 @@ class VIEW3D_PT_OmniTools(bpy.types.Panel):
 		col = layout.column(align=True)
 		col.operator("view3d.mirror_weights",text="Mirror Weights")
 
-		# col = layout.column(align=True)
-		# col.prop()
+
 
 
 ################

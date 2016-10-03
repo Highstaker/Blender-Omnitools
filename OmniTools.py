@@ -113,11 +113,12 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 
 	axes_menu_items = (("x", "X", "", 0),("y", "Y", "", 1),("z", "Z", "", 2),)
 
-	axis = bpy.props.EnumProperty(items=axes_menu_items,name="Axxis",description="")
+	axis = bpy.props.EnumProperty(items=axes_menu_items,name="Axis",description="")
 	negative = bpy.props.BoolProperty(name="Negative",subtype="NONE",description="Copy from negative to positive side if checked. If unchecked - from positive to negative")
 	margin = bpy.props.FloatProperty(name="Margin",unit="LENGTH",subtype="NONE", soft_min=0, step=0.00001*100,description="", default=0.00001, precision=6)
 
 	def execute(self, context):
+		print("context.scene.processes",context.scene.processes)#debug
 		active_obj = context.active_object
 		data = active_obj.data
 		axis_index = "xyz".index(self.axis)
