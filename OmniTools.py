@@ -1,31 +1,9 @@
-#TODO:
-#-Delete Half : Give negatives to each axis
-#-Make reinitter, unwrapper and image saver allpy for all selected objects, not only active.
-
-
-
-# import the basic library
 import bpy
 import os
 import random
 from mathutils import Vector
 
-############################
-###GLOBAL METHODS########
-##########################
-
-def vectorMultiply(a,b):
-	"""
-	Multiplies elements of `a` with the respective elements of `b`
-	"""
-	return Vector(x * y for x, y in zip(a, b))
-
-def getSelectedMeshObjects():
-	"""
-	Returns a list of selected mesh objects
-	"""
-	return [i for i in bpy.context.scene.objects if i.select and i.type == 'MESH']
-
+from utils import vectorMultiply, getSelectedMeshObjects
 
 
 class VIEW3D_OT_unwrap(bpy.types.Operator):
@@ -35,7 +13,7 @@ class VIEW3D_OT_unwrap(bpy.types.Operator):
 
 	def execute(self, context):
 		bpy.ops.object.mode_set(mode="EDIT")
-		bpy.context.tool_settings.mesh_select_mode = (False , False , True) #vert, edge, face
+		bpy.context.tool_settings.mesh_select_mode = (False, False, True)  # vert, edge, face
 		for i in range(len(bpy.context.object.material_slots)):
 			bpy.context.object.active_material_index = i
 			bpy.ops.object.material_slot_select()
@@ -44,15 +22,15 @@ class VIEW3D_OT_unwrap(bpy.types.Operator):
 
 		return {'FINISHED'}
 
+
 class VIEW3D_OT_next_material_select(bpy.types.Operator):
 	bl_label = "Next Material Select"
 	bl_idname = "view3d.next_material_select"
 	bl_description = "Selects all faces with the material that is next in the stack, deselecting faces not belonging to thos material."
 
 	def execute(self, context):
-
 		bpy.ops.object.mode_set(mode="EDIT")
-		bpy.context.tool_settings.mesh_select_mode = (False , False , True) #vert, edge, face
+		bpy.context.tool_settings.mesh_select_mode = (False, False, True)  # vert, edge, face
 
 		am = len(bpy.context.object.material_slots)
 
@@ -67,15 +45,15 @@ class VIEW3D_OT_next_material_select(bpy.types.Operator):
 
 		return {'FINISHED'}
 
+
 class VIEW3D_OT_previous_material_select(bpy.types.Operator):
 	bl_label = "Previous Material Select"
 	bl_idname = "view3d.previous_material_select"
 	bl_description = "Selects all faces with the material that is previous in the stack, deselecting faces not belonging to thos material."
 
 	def execute(self, context):
-
 		bpy.ops.object.mode_set(mode="EDIT")
-		bpy.context.tool_settings.mesh_select_mode = (False , False , True) #vert, edge, face
+		bpy.context.tool_settings.mesh_select_mode = (False, False, True)  # vert, edge, face
 
 		am = len(bpy.context.object.material_slots)
 
@@ -90,20 +68,21 @@ class VIEW3D_OT_previous_material_select(bpy.types.Operator):
 
 		return {'FINISHED'}
 
+
 class VIEW3D_OT_this_material_select(bpy.types.Operator):
 	bl_label = "This Material Select"
 	bl_idname = "view3d.this_material_select"
 	bl_description = "Selects all faces with the material that is currently selected, deselecting faces not belonging to thos material."
 
 	def execute(self, context):
-
 		bpy.ops.object.mode_set(mode="EDIT")
-		bpy.context.tool_settings.mesh_select_mode = (False , False , True) #vert, edge, face
+		bpy.context.tool_settings.mesh_select_mode = (False, False, True)  # vert, edge, face
 
 		bpy.ops.mesh.select_all(action='DESELECT')
 		bpy.ops.object.material_slot_select()
 
 		return {'FINISHED'}
+
 
 class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 	bl_label = "Select Half"
@@ -111,14 +90,16 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 	bl_description = "Mirror weights from one half to another"
 	bl_options = {'REGISTER', 'UNDO'}
 
-	axes_menu_items = (("x", "X", "", 0),("y", "Y", "", 1),("z", "Z", "", 2),)
+	axes_menu_items = (("x", "X", "", 0), ("y", "Y", "", 1), ("z", "Z", "", 2),)
 
-	axis = bpy.props.EnumProperty(items=axes_menu_items,name="Axis",description="")
-	negative = bpy.props.BoolProperty(name="Negative",subtype="NONE",description="Copy from negative to positive side if checked. If unchecked - from positive to negative")
-	margin = bpy.props.FloatProperty(name="Margin",unit="LENGTH",subtype="NONE", soft_min=0, step=0.00001*100,description="", default=0.00001, precision=6)
+	axis = bpy.props.EnumProperty(items=axes_menu_items, name="Axis", description="")
+	negative = bpy.props.BoolProperty(name="Negative", subtype="NONE",
+									  description="Copy from negative to positive side if checked. If unchecked - from positive to negative")
+	margin = bpy.props.FloatProperty(name="Margin", unit="LENGTH", subtype="NONE", soft_min=0, step=0.00001 * 100,
+									 description="", default=0.00001, precision=6)
 
 	def execute(self, context):
-		print("context.scene.processes",context.scene.processes)#debug
+		print("context.scene.processes", context.scene.processes)  # debug
 		active_obj = context.active_object
 		data = active_obj.data
 		axis_index = "xyz".index(self.axis)
@@ -126,7 +107,7 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 		# get active vertex group
 		vertex_group = active_obj.vertex_groups.active
 
-		def symmetricals(a,b):
+		def symmetricals(a, b):
 			"""
 			Checks whether the vertices are symmetrical along given axis or not.
 			"""
@@ -205,40 +186,43 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 
 		return {'FINISHED'}
 
+
 class VIEW3D_OT_select_half(bpy.types.Operator):
-	#TO-DO: add negatives per axis, 
-	#add props descriptions
+	# TO-DO: add negatives per axis,
+	# add props descriptions
 	bl_label = "Select Half"
 	bl_idname = "view3d.select_half"
 	bl_description = "Selects the verticies that are to one side of pivot point."
 	bl_options = {'REGISTER', 'UNDO'}
 
-	margin = bpy.props.FloatProperty(name="Margin",unit="LENGTH",subtype="NONE", soft_min=0, step=0.01,description="")
-	axis = bpy.props.BoolVectorProperty(name="Axis",subtype="XYZ",description="",default=(True,False,False))
-	negative = bpy.props.BoolProperty(name="Negative",subtype="NONE",description="")
+	margin = bpy.props.FloatProperty(name="Margin", unit="LENGTH", subtype="NONE", soft_min=0, step=0.01,
+									 description="")
+	axis = bpy.props.BoolVectorProperty(name="Axis", subtype="XYZ", description="", default=(True, False, False))
+	negative = bpy.props.BoolProperty(name="Negative", subtype="NONE", description="")
 
 	def execute(self, context):
 
 		data = bpy.context.scene.objects.active.data
 		bpy.ops.object.mode_set(mode="EDIT")
 		bpy.ops.mesh.select_all(action="DESELECT")
-		bpy.context.tool_settings.mesh_select_mode = (True , False , False) #vert, edge, face
+		bpy.context.tool_settings.mesh_select_mode = (True, False, False)  # vert, edge, face
 		bpy.ops.object.mode_set(mode="OBJECT")
 
 		if True not in self.axis:
-			#there must be an axis to operate on. If none is chosen, choose X
-			self.axis = (True,False,False)
+			# there must be an axis to operate on. If none is chosen, choose X
+			self.axis = (True, False, False)
 
-		#iterate over all axises
+		# iterate over all axises
 		for i in range(3):
 			for vert in data.vertices:
 				if self.axis[i]:
 					if not ((vert.co[i] < (0.0 - (2 * int(self.negative) - 1) * self.margin)) ^ self.negative):
 						vert.select = True
-				
+
 		bpy.ops.object.mode_set(mode="EDIT")
 
 		return {'FINISHED'}
+
 
 class VIEW3D_OT_reinit_images(bpy.types.Operator):
 	bl_label = "Re-initialize images"
@@ -246,13 +230,11 @@ class VIEW3D_OT_reinit_images(bpy.types.Operator):
 	bl_description = "Regenerates images that correspond to selected image texture nodes in every material of the object. Useful when the images use external files and these files get deleted."
 
 	def execute(self, context):
-
 		for slot in bpy.context.active_object.material_slots:
-			
 			mat = slot.material
 
 			imag = mat.node_tree.nodes.active.image
-			
+
 			imag.source = 'GENERATED'
 
 		return {'FINISHED'}
@@ -264,14 +246,12 @@ class VIEW3D_OT_save_baked_images(bpy.types.Operator):
 	bl_description = "Saves all the baked images in active object."
 
 	def execute(self, context):
-
 		for slot in bpy.context.active_object.material_slots:
-			
 			mat = slot.material
 
 			imag = mat.node_tree.nodes.active.image
 
-			#filepath_raw doesn't erase image data, unlike filepath
+			# filepath_raw doesn't erase image data, unlike filepath
 			imag.filepath_raw = "//textures/" + imag.name + ".png"
 
 			imag.file_format = 'PNG'
@@ -299,7 +279,7 @@ class VIEW3D_OT_fake_backup_mesh(bpy.types.Operator):
 		bak_mesh.name = NAME + "_old"
 
 		bak_mesh.use_fake_user = True
- 
+
 		bpy.ops.object.mode_set(mode=cur_mode)
 
 		return {'FINISHED'}
@@ -311,9 +291,8 @@ class VIEW3D_OT_make_single_user(bpy.types.Operator):
 	bl_description = "Creates a new mesh with the same name and assigns the object to it, effectively making it single-user. The old mesh is backed up with '_multi' postfix. Useful when you need to apply modifiers to multi-user data."
 
 	def execute(self, context):
-
 		bpy.ops.object.mode_set(mode="OBJECT")
-		active_obj =  bpy.context.scene.objects.active
+		active_obj = bpy.context.scene.objects.active
 		orig_mesh = active_obj.data
 		NAME = orig_mesh.name
 		copy_mesh = orig_mesh.copy()
@@ -323,16 +302,17 @@ class VIEW3D_OT_make_single_user(bpy.types.Operator):
 
 		return {'FINISHED'}
 
+
 class VIEW3D_OT_replace_data_by_active(bpy.types.Operator):
 	bl_label = "Replace data by active"
 	bl_idname = "view3d.replace_data_by_active"
 	bl_description = "Replaces the data in the objects that contain the data specified in the menu with the data in active object. Useful for applying changes to other meshes after using 'Make mesh single-user' and applying modifiers."
-	bl_options = {"REGISTER", "UNDO"}  
+	bl_options = {"REGISTER", "UNDO"}
 
-	def item_cb(self, context):  
-		return [(ob.name, ob.name, ob.name) for ob in bpy.data.meshes]  
+	def item_cb(self, context):
+		return [(ob.name, ob.name, ob.name) for ob in bpy.data.meshes]
 
-	mesh_name = bpy.props.EnumProperty(items=item_cb,name = "Mesh Data",description = "Mesh data to be replaced")
+	mesh_name = bpy.props.EnumProperty(items=item_cb, name="Mesh Data", description="Mesh data to be replaced")
 
 	def execute(self, context):
 
@@ -364,10 +344,13 @@ class VIEW3D_OT_dae_export_selected_per_scene(bpy.types.Operator):
 
 		for scene in bpy.data.scenes:
 			bpy.context.screen.scene = scene
-			filepath = os.path.dirname(bpy.data.filepath) + "/" + EXPORT_FOLDER + "/" + os.path.splitext(bpy.path.basename(bpy.context.blend_data.filepath))[0]+ "_" + scene.name + ".dae"
+			filepath = os.path.dirname(bpy.data.filepath) + "/" + EXPORT_FOLDER + "/" + \
+					   os.path.splitext(bpy.path.basename(bpy.context.blend_data.filepath))[
+						   0] + "_" + scene.name + ".dae"
 			bpy.ops.wm.collada_export(filepath=filepath, apply_modifiers=True, selected=True)
 
 		return {'FINISHED'}
+
 
 class VIEW3D_OT_array_rotation_jitter(bpy.types.Operator):
 	bl_idname = "view3d.array_rotation_jitter"
@@ -378,13 +361,13 @@ class VIEW3D_OT_array_rotation_jitter(bpy.types.Operator):
 	# changeable parameters
 
 	total = bpy.props.IntProperty(name="Amount of instances", default=2, min=1, max=1000)
-	offsets = bpy.props.FloatVectorProperty(name="Fixed Offsets",unit="LENGTH",subtype="TRANSLATION")
-	max_rotations = bpy.props.FloatVectorProperty(name="Maximum rotations",unit="ROTATION"
-		,subtype="EULER",min=0)
+	offsets = bpy.props.FloatVectorProperty(name="Fixed Offsets", unit="LENGTH", subtype="TRANSLATION")
+	max_rotations = bpy.props.FloatVectorProperty(name="Maximum rotations", unit="ROTATION"
+												  , subtype="EULER", min=0)
 	max_random_offsets = bpy.props.FloatVectorProperty(name="Max Offset Jitter",
-		unit="LENGTH",subtype="TRANSLATION",min=0)
-	scale_jitter=bpy.props.FloatVectorProperty(name="Scale Jitter",unit="LENGTH"
-		,subtype="DIRECTION",min=0)
+													   unit="LENGTH", subtype="TRANSLATION", min=0)
+	scale_jitter = bpy.props.FloatVectorProperty(name="Scale Jitter", unit="LENGTH"
+												 , subtype="DIRECTION", min=0)
 
 	def execute(self, context):
 		scene = context.scene
@@ -392,37 +375,37 @@ class VIEW3D_OT_array_rotation_jitter(bpy.types.Operator):
 		obj = scene.objects.active
 
 		for i in range(self.total):
-			obj_new = obj.copy() #copy current object
-			scene.objects.link(obj_new) #add object to scene
-			
-			#offset
+			obj_new = obj.copy()  # copy current object
+			scene.objects.link(obj_new)  # add object to scene
+
+			# offset
 			cur_position_jitter = [random.random() for i in range(3)]
-			obj_new.location = [a + b * (i+1) + (2*d-1) * c for a, b, c, d in 
-			zip(obj.location,self.offsets,self.max_random_offsets,cur_position_jitter)]            
+			obj_new.location = [a + b * (i + 1) + (2 * d - 1) * c for a, b, c, d in
+								zip(obj.location, self.offsets, self.max_random_offsets, cur_position_jitter)]
 
-			#scale randomness
+			# scale randomness
 			cur_scale_jitter = [random.random() for i in range(3)]
-			obj_new.scale = [a + b * (2*c-1) for a, b, c in
-			 zip(obj.scale,self.scale_jitter,cur_scale_jitter)]
+			obj_new.scale = [a + b * (2 * c - 1) for a, b, c in
+							 zip(obj.scale, self.scale_jitter, cur_scale_jitter)]
 
-			#apply rotation randomness
+			# apply rotation randomness
 			cur_rotation_jitter = [random.random() for i in range(3)]
-			obj_new.rotation_euler = [a + b * (2*c-1) for a, b, c in
-			 zip(obj.rotation_euler,self.max_rotations,cur_rotation_jitter)]
-
+			obj_new.rotation_euler = [a + b * (2 * c - 1) for a, b, c in
+									  zip(obj.rotation_euler, self.max_rotations, cur_rotation_jitter)]
 
 		return {'FINISHED'}
 
+
 class VIEW3D_OT_move_pivot(bpy.types.Operator):
-	bl_idname = "view3d.move_pivot"        # unique identifier for buttons and menu items to reference.
-	bl_label = "Move Pivot"         # display name in the interface.
+	bl_idname = "view3d.move_pivot"  # unique identifier for buttons and menu items to reference.
+	bl_label = "Move Pivot"  # display name in the interface.
 	bl_description = "Moves the pivot point (origin) according to input"
 	bl_options = {'REGISTER', 'UNDO'}  # enable undo for the operator.
 
-	pivot_offset=bpy.props.FloatVectorProperty(name="Pivot Offset",
-		unit="LENGTH",subtype="TRANSLATION")
+	pivot_offset = bpy.props.FloatVectorProperty(name="Pivot Offset",
+												 unit="LENGTH", subtype="TRANSLATION")
 
-	def execute(self, context):        # execute() is called by blender when running the operator.
+	def execute(self, context):  # execute() is called by blender when running the operator.
 		scene = context.scene
 		cursor = scene.cursor_location
 		obj = scene.objects.active
@@ -435,4 +418,4 @@ class VIEW3D_OT_move_pivot(bpy.types.Operator):
 
 		obj.location += vectorMultiply(self.pivot_offset, obj.scale)
 
-		return {'FINISHED'}            # this lets blender know the operator finished successfully.
+		return {'FINISHED'}  # this lets blender know the operator finished successfully.
