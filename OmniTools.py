@@ -3,13 +3,14 @@ import os
 import random
 from mathutils import Vector
 
-from .utils import vectorMultiply, getSelectedMeshObjects
+from .utils import vectorMultiply, getSelectedMeshObjects, selectActiveMaterialOnly, selectNeighbourMaterial
 
-
+#works
 class VIEW3D_OT_unwrap(bpy.types.Operator):
 	bl_label = "Unwrap Materials Separately"
 	bl_idname = "view3d.unwrap_per_material"
 	bl_description = "Selects each material one by one and makes a UV-unwrap on per-material basis"
+	bl_options = {'REGISTER', 'UNDO'}
 
 	def execute(self, context):
 		bpy.ops.object.mode_set(mode="EDIT")
@@ -22,68 +23,48 @@ class VIEW3D_OT_unwrap(bpy.types.Operator):
 
 		return {'FINISHED'}
 
-
+#works
 class VIEW3D_OT_next_material_select(bpy.types.Operator):
 	bl_label = "Next Material Select"
 	bl_idname = "view3d.next_material_select"
-	bl_description = "Selects all faces with the material that is next in the stack, deselecting faces not belonging to thos material."
+	bl_description = "Selects all faces with the material that is next in the stack," \
+					 " deselecting faces not belonging to this material."
+	bl_options = {'REGISTER', 'UNDO'}
 
 	def execute(self, context):
-		bpy.ops.object.mode_set(mode="EDIT")
-		bpy.context.tool_settings.mesh_select_mode = (False, False, True)  # vert, edge, face
-
-		am = len(bpy.context.object.material_slots)
-
-		cur_i = bpy.context.object.active_material_index
-
-		cur_i = (cur_i + 1) % am
-
-		bpy.context.object.active_material_index = cur_i
-
-		bpy.ops.mesh.select_all(action='DESELECT')
-		bpy.ops.object.material_slot_select()
+		selectNeighbourMaterial(context, forward=True)
 
 		return {'FINISHED'}
 
-
+#works
 class VIEW3D_OT_previous_material_select(bpy.types.Operator):
 	bl_label = "Previous Material Select"
 	bl_idname = "view3d.previous_material_select"
-	bl_description = "Selects all faces with the material that is previous in the stack, deselecting faces not belonging to thos material."
+	bl_description = "Selects all faces with the material that is previous in the stack," \
+					 " deselecting faces not belonging to this material."
+	bl_options = {'REGISTER', 'UNDO'}
 
 	def execute(self, context):
-		bpy.ops.object.mode_set(mode="EDIT")
-		bpy.context.tool_settings.mesh_select_mode = (False, False, True)  # vert, edge, face
-
-		am = len(bpy.context.object.material_slots)
-
-		cur_i = bpy.context.object.active_material_index
-
-		cur_i = (cur_i - 1) % am
-
-		bpy.context.object.active_material_index = cur_i
-
-		bpy.ops.mesh.select_all(action='DESELECT')
-		bpy.ops.object.material_slot_select()
+		selectNeighbourMaterial(context, forward=False)
 
 		return {'FINISHED'}
 
-
+#works
 class VIEW3D_OT_this_material_select(bpy.types.Operator):
 	bl_label = "This Material Select"
 	bl_idname = "view3d.this_material_select"
-	bl_description = "Selects all faces with the material that is currently selected, deselecting faces not belonging to thos material."
+	bl_description = 'Selects all faces with the material that is currently selected, ' \
+					 'deselecting faces not belonging to this material.'
+	bl_options = {'REGISTER', 'UNDO'}
 
 	def execute(self, context):
 		bpy.ops.object.mode_set(mode="EDIT")
 		bpy.context.tool_settings.mesh_select_mode = (False, False, True)  # vert, edge, face
-
-		bpy.ops.mesh.select_all(action='DESELECT')
-		bpy.ops.object.material_slot_select()
+		selectActiveMaterialOnly()
 
 		return {'FINISHED'}
 
-
+#works
 class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 	bl_label = "Select Half"
 	bl_idname = "view3d.mirror_weights"
@@ -186,60 +167,58 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 
 		return {'FINISHED'}
 
-
+#works
 class VIEW3D_OT_select_half(bpy.types.Operator):
-	# TO-DO: add negatives per axis,
-	# add props descriptions
 	bl_label = "Select Half"
 	bl_idname = "view3d.select_half"
 	bl_description = "Selects the verticies that are to one side of pivot point."
 	bl_options = {'REGISTER', 'UNDO'}
 
-	margin = bpy.props.FloatProperty(name="Margin", unit="LENGTH", subtype="NONE", soft_min=0, step=0.01,
-									 description="")
-	axis = bpy.props.BoolVectorProperty(name="Axis", subtype="XYZ", description="", default=(True, False, False))
+	axes_menu_items = (("x", "X", "", 0), ("y", "Y", "", 1), ("z", "Z", "", 2),)
+
+	margin = bpy.props.FloatProperty(name="Margin", unit="LENGTH", subtype="NONE",
+									 min=0.00001, step=0.001, precision=6,
+									description="")
+	axis = bpy.props.EnumProperty(items=axes_menu_items, name="Axis", description="")
 	negative = bpy.props.BoolProperty(name="Negative", subtype="NONE", description="")
+	deselect = bpy.props.BoolProperty(name="Deselect", subtype="NONE", description="")
 
 	def execute(self, context):
+		active_obj = context.active_object
+		data = active_obj.data
+		axis_index = "xyz".index(self.axis)
 
-		data = bpy.context.scene.objects.active.data
 		bpy.ops.object.mode_set(mode="EDIT")
-		bpy.ops.mesh.select_all(action="DESELECT")
-		bpy.context.tool_settings.mesh_select_mode = (True, False, False)  # vert, edge, face
-		bpy.ops.object.mode_set(mode="OBJECT")
+		if self.deselect:
+			bpy.ops.mesh.select_all(action="DESELECT")
+		context.tool_settings.mesh_select_mode = (True, False, False)  # vert, edge, face
+		bpy.ops.object.mode_set(mode="OBJECT")  # or else it won't update
 
-		if True not in self.axis:
-			# there must be an axis to operate on. If none is chosen, choose X
-			self.axis = (True, False, False)
-
-		# iterate over all axises
-		for i in range(3):
-			for vert in data.vertices:
-				if self.axis[i]:
-					if not ((vert.co[i] < (0.0 - (2 * int(self.negative) - 1) * self.margin)) ^ self.negative):
-						vert.select = True
+		for vert in data.vertices:
+			sym_coord = vert.co[axis_index]
+			compare_me = sym_coord.__lt__ if self.negative else sym_coord.__gt__
+			if compare_me(0.0 + self.margin * (-1 if self.negative else 1)):
+				vert.select = True
 
 		bpy.ops.object.mode_set(mode="EDIT")
 
 		return {'FINISHED'}
 
-
+#works
 class VIEW3D_OT_reinit_images(bpy.types.Operator):
 	bl_label = "Re-initialize images"
 	bl_idname = "view3d.reinit_images"
 	bl_description = "Regenerates images that correspond to selected image texture nodes in every material of the object. Useful when the images use external files and these files get deleted."
 
 	def execute(self, context):
-		for slot in bpy.context.active_object.material_slots:
+		for slot in context.active_object.material_slots:
 			mat = slot.material
-
 			imag = mat.node_tree.nodes.active.image
-
 			imag.source = 'GENERATED'
 
 		return {'FINISHED'}
 
-
+#TODO: upgrade this one
 class VIEW3D_OT_save_baked_images(bpy.types.Operator):
 	bl_label = "Save baked images"
 	bl_idname = "view3d.save_baked_images"
@@ -260,14 +239,14 @@ class VIEW3D_OT_save_baked_images(bpy.types.Operator):
 
 		return {'FINISHED'}
 
-
+#works
 class VIEW3D_OT_fake_backup_mesh(bpy.types.Operator):
 	bl_label = "Backup mesh"
 	bl_idname = "view3d.fake_backup_mesh"
 	bl_description = "Backups mesh, creating a fake user."
 
 	def execute(self, context):
-		cur_mode = bpy.context.active_object.mode
+		cur_mode = context.active_object.mode
 
 		bpy.ops.object.mode_set(mode="OBJECT")
 
@@ -284,7 +263,7 @@ class VIEW3D_OT_fake_backup_mesh(bpy.types.Operator):
 
 		return {'FINISHED'}
 
-
+#works
 class VIEW3D_OT_make_single_user(bpy.types.Operator):
 	bl_label = "Make mesh single-user"
 	bl_idname = "view3d.make_single_user"
@@ -302,7 +281,7 @@ class VIEW3D_OT_make_single_user(bpy.types.Operator):
 
 		return {'FINISHED'}
 
-
+#TODO: deprecate, cuz Alt+C can do it
 class VIEW3D_OT_replace_data_by_active(bpy.types.Operator):
 	bl_label = "Replace data by active"
 	bl_idname = "view3d.replace_data_by_active"
@@ -333,7 +312,7 @@ class VIEW3D_OT_replace_data_by_active(bpy.types.Operator):
 
 		return {'FINISHED'}
 
-
+#TODO: needs upgrading!
 class VIEW3D_OT_dae_export_selected_per_scene(bpy.types.Operator):
 	bl_label = "Collada export selected per scene"
 	bl_idname = "view3d.dae_export_selected_per_scene"
@@ -343,7 +322,7 @@ class VIEW3D_OT_dae_export_selected_per_scene(bpy.types.Operator):
 		EXPORT_FOLDER = 'dae_exports'
 
 		for scene in bpy.data.scenes:
-			bpy.context.screen.scene = scene
+			context.screen.scene = scene
 			filepath = os.path.dirname(bpy.data.filepath) + "/" + EXPORT_FOLDER + "/" + \
 					   os.path.splitext(bpy.path.basename(bpy.context.blend_data.filepath))[
 						   0] + "_" + scene.name + ".dae"
@@ -351,7 +330,7 @@ class VIEW3D_OT_dae_export_selected_per_scene(bpy.types.Operator):
 
 		return {'FINISHED'}
 
-
+#works
 class VIEW3D_OT_array_rotation_jitter(bpy.types.Operator):
 	bl_idname = "view3d.array_rotation_jitter"
 	bl_label = "Array with Rotation Jitter"
@@ -395,7 +374,7 @@ class VIEW3D_OT_array_rotation_jitter(bpy.types.Operator):
 
 		return {'FINISHED'}
 
-
+#works. Offset values are relative to object scale, not world
 class VIEW3D_OT_move_pivot(bpy.types.Operator):
 	bl_idname = "view3d.move_pivot"  # unique identifier for buttons and menu items to reference.
 	bl_label = "Move Pivot"  # display name in the interface.
