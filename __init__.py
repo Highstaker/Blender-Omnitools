@@ -5,7 +5,7 @@
 bl_info = {
 "name": "Omni-Tools",
 "author": "Highstaker a.k.a. Omni H. Sable",
-"version": (1, 1, 4),
+"version": (1, 1, 5),
 "blender": (2, 74, 0),
 "location": "View3D > Tool Shelf > Omni-Tools Tab",
 "description": "A set of my tools to boost the workflow",
@@ -17,8 +17,12 @@ bl_info = {
 # To support reload properly, try to access a package var,
 # if it's there, reload everything
 if "bpy" in locals():
-	import imp
-	imp.reload(OmniTools)
+	try:
+		import importlib
+		importlib.reload(OmniTools)
+	except ImportError:
+		import imp
+		imp.reload(OmniTools)
 	print("Reloaded multifiles")
 else:
 	from . import OmniTools

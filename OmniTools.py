@@ -3,7 +3,7 @@ import os
 import random
 from mathutils import Vector
 
-from utils import vectorMultiply, getSelectedMeshObjects
+from .utils import vectorMultiply, getSelectedMeshObjects
 
 
 class VIEW3D_OT_unwrap(bpy.types.Operator):
