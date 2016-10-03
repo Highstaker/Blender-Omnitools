@@ -219,11 +219,13 @@ class VIEW3D_OT_reinit_images(bpy.types.Operator):
 
 		return {'FINISHED'}
 
-#TODO: upgrade this one
+#works
 class VIEW3D_OT_save_baked_images(bpy.types.Operator):
 	bl_label = "Save baked images"
 	bl_idname = "view3d.save_baked_images"
 	bl_description = "Saves all the baked images in active object."
+
+	directory = bpy.props.StringProperty(subtype="DIR_PATH")
 
 	def execute(self, context):
 		for slot in bpy.context.active_object.material_slots:
@@ -232,13 +234,18 @@ class VIEW3D_OT_save_baked_images(bpy.types.Operator):
 			imag = mat.node_tree.nodes.active.image
 
 			# filepath_raw doesn't erase image data, unlike filepath
-			imag.filepath_raw = "//textures/" + imag.name + ".png"
+			imag.filepath_raw = os.path.join(self.directory, imag.name + ".png")
 
 			imag.file_format = 'PNG'
 
 			imag.save()
 
 		return {'FINISHED'}
+
+	def invoke(self, context, event):
+		wm = context.window_manager
+		wm.fileselect_add(self)
+		return {'RUNNING_MODAL'}
 
 #works
 class VIEW3D_OT_fake_backup_mesh(bpy.types.Operator):
@@ -289,15 +296,9 @@ class VIEW3D_OT_dae_export_selected_per_scene(bpy.types.Operator):
 	bl_idname = "view3d.dae_export_selected_per_scene"
 	bl_description = "Iterates over all scenes and exports meshes from each into a separate .dae file."
 
-	# filepath = bpy.props.StringProperty(subtype="FILE_PATH")
 	directory = bpy.props.StringProperty(subtype="DIR_PATH")
 
 	def execute(self, context):
-		# print("filepath",self.filepath)#debug
-		print("directory",self.directory)#debug
-
-		# EXPORT_FOLDER = 'dae_exports'
-
 		for scene in bpy.data.scenes:
 			context.screen.scene = scene
 			filepath = os.path.join(self.directory,
