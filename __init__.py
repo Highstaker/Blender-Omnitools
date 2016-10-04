@@ -45,16 +45,16 @@ class VIEW3D_PT_OmniTools(bpy.types.Panel):
 		layout = self.layout
 		view = context.space_data
 
-		col = layout.column(align=True)
-		layout.prop(data=context.scene, property='processes')
+		# col = layout.column(align=True)
+		# layout.prop(data=context.scene, property='processes')
 
 		col = layout.column(align=True)
 		col.operator("view3d.unwrap_per_material",text="Unwrap per material")
 
 		col = layout.column(align=True)
-		col.operator("view3d.next_material_select",text="Next Material Verticies")
-		col.operator("view3d.this_material_select",text="Current Material Verticies")
-		col.operator("view3d.previous_material_select",text="Previous Material Verticies")
+		col.operator("view3d.previous_material_select",text="Previous Material Vertices")
+		col.operator("view3d.this_material_select",text="Current Material Vertices")
+		col.operator("view3d.next_material_select",text="Next Material Vertices")
 
 		col = layout.column(align=True)
 		col.operator("view3d.select_half",text="Select Half")
