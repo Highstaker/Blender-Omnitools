@@ -5,7 +5,7 @@
 bl_info = {
 "name": "Omni-Tools",
 "author": "Highstaker a.k.a. Omni H. Sable",
-"version": (1, 1, 8),
+"version": (1, 2, 0),
 "blender": (2, 74, 0),
 "location": "View3D > Tool Shelf > Omni-Tools Tab",
 "description": "A set of my tools to boost the workflow",
@@ -33,6 +33,10 @@ from bpy.props import *
 
 PROCESSES = 4
 bpy.types.Scene.processes = IntProperty(name="Processes", description="", min=PROCESSES, )
+
+algorithms_menu_items = (("perebor", "Perebor", "", 0), ("vector_grouper", "Vector-grouper", "", 1),)
+bpy.types.Scene.weight_mirror_algorithm = bpy.props.EnumProperty(items=algorithms_menu_items, name="Algorithm", description="")
+
 
 # main class of this toolbar
 class VIEW3D_PT_OmniTools(bpy.types.Panel):
@@ -84,6 +88,7 @@ class VIEW3D_PT_OmniTools(bpy.types.Panel):
 
 		col = layout.column(align=True)
 		col.operator("view3d.mirror_weights",text="Mirror Weights")
+		col.prop(data=context.scene, property='weight_mirror_algorithm')
 
 
 

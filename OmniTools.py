@@ -1,9 +1,11 @@
 import bpy
 import os
 import random
+from time import time
+
 from mathutils import Vector
 
-from .utils import vectorMultiply, getSelectedMeshObjects, selectActiveMaterialOnly, selectNeighbourMaterial
+from .utils import vectorMultiply, vectorLength, getSelectedMeshObjects, selectActiveMaterialOnly, selectNeighbourMaterial
 
 #works
 #TODO: Add more unwrap modes and options
@@ -73,7 +75,10 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 	bl_options = {'REGISTER', 'UNDO'}
 
 	axes_menu_items = (("x", "X", "", 0), ("y", "Y", "", 1), ("z", "Z", "", 2),)
+	# algorithms_menu_items = (("perebor", "Perebor", "", 0), ("vector_grouper", "Vector-grouper", "", 1),)
 
+	# algorithm = bpy.props.EnumProperty(items=algorithms_menu_items, name="Algorithm", description="")
+	resolution = bpy.props.IntProperty(name="Resolution",description="", min=1, default=19, max=30)
 	axis = bpy.props.EnumProperty(items=axes_menu_items, name="Axis", description="Axis of symmetry")
 	negative = bpy.props.BoolProperty(name="Negative", subtype="NONE",
 									  description="Copy from negative to positive side if checked. If unchecked - from positive to negative")
@@ -81,7 +86,6 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 									 description="The coordinate of a vertex will be checked in the interval with width of 2*margin. Needed to avoid precision problems. Should be left at default value most of the time.", default=0.00001, precision=6)
 
 	def execute(self, context):
-		print("context.scene.processes", context.scene.processes)  # debug
 		active_obj = context.active_object
 		data = active_obj.data
 		axis_index = "xyz".index(self.axis)
@@ -102,69 +106,177 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 
 			return all(result)
 
-		positives = []
-		negatives = []
+		def perebor():
+			positives = []
+			negatives = []
 
-		for vert in data.vertices:
-			vert_coords = vert.co.to_tuple()
-			if self.negative:
-				# negative (from -X to +X)
-				if vert_coords[axis_index] < 0:
-					# weights are copied FROM these
-					try:
-						vert_weight = vertex_group.weight(vert.index)
-					except RuntimeError:
-						continue
-					# look for symmetrical vertex among saved ones
-					for n, other_vert_index in enumerate(positives):
-						other_vert_coords = data.vertices[other_vert_index].co.to_tuple()
-						if symmetricals(other_vert_coords, vert_coords):
-							vertex_group.add((other_vert_index,), vert_weight, "REPLACE")
-							positives.pop(n)
-							break
+			for vert in data.vertices:
+				vert_coords = vert.co.to_tuple()
+				if self.negative:
+					# negative (from -X to +X)
+					if vert_coords[axis_index] < 0:
+						# weights are copied FROM these
+						try:
+							vert_weight = vertex_group.weight(vert.index)
+						except RuntimeError:
+							continue
+						# look for symmetrical vertex among saved ones
+						for n, other_vert_index in enumerate(positives):
+							other_vert_coords = data.vertices[other_vert_index].co.to_tuple()
+							if symmetricals(other_vert_coords, vert_coords):
+								vertex_group.add((other_vert_index,), vert_weight, "REPLACE")
+								positives.pop(n)
+								break
+						else:
+							negatives.append(vert.index)
+					elif vert_coords[axis_index] > 0:
+						# weights are copied TO these
+						for n, other_vert_index in enumerate(negatives):
+							other_vert_coords = data.vertices[other_vert_index].co.to_tuple()
+							if symmetricals(other_vert_coords, vert_coords):
+								vert_weight = vertex_group.weight(other_vert_index)
+								vertex_group.add((vert.index,), vert_weight, "REPLACE")
+								negatives.pop(n)
+								break
+						else:
+							vertex_group.add((vert.index,), 0.0, "REPLACE")
+							positives.append(vert.index)
+				else:
+					# positive (from +X to -X)
+					if vert_coords[axis_index] > 0:
+						# weights are copied FROM these
+						try:
+							vert_weight = vertex_group.weight(vert.index)
+						except RuntimeError:
+							continue
+						# look for symmetrical vertex among saved ones
+						for n, other_vert_index in enumerate(negatives):
+							other_vert_coords = data.vertices[other_vert_index].co.to_tuple()
+							if symmetricals(other_vert_coords, vert_coords):
+								vertex_group.add((other_vert_index,), vert_weight, "REPLACE")
+								negatives.pop(n)
+								break
+						else:
+							positives.append(vert.index)
+					elif vert_coords[axis_index] < 0:
+						# weights are copied TO these
+						for n, other_vert_index in enumerate(positives):
+							other_vert_coords = data.vertices[other_vert_index].co.to_tuple()
+							if symmetricals(other_vert_coords, vert_coords):
+								vert_weight = vertex_group.weight(other_vert_index)
+								vertex_group.add((vert.index,), vert_weight, "REPLACE")
+								positives.pop(n)
+								break
+						else:
+							vertex_group.add((vert.index,), 0.0, "REPLACE")
+							negatives.append(vert.index)
+
+		def vector_grouper():
+			def assignWeight(a,b):
+				"""
+				Assigns a weight from a to b. If a has no weight data, assigns 0 to b.
+				:param a:
+				:param b:
+				:return:
+				"""
+				try:
+					vert_weight = vertex_group.weight(a)
+					vertex_group.add((b,), vert_weight, "REPLACE")
+				except RuntimeError:
+					vertex_group.add((b,), 0, "REPLACE")
+
+			def searcher(A, B):
+				"""
+				Looks for symmetical vertices in A and B and assigns weight from 
+				a vertex in A to a corresponding vertex in B.
+				"""
+				for a in A:
+					coord_a = data.vertices[a].co.to_tuple()
+					for b in B:
+						coord_b = data.vertices[b].co.to_tuple()
+						if symmetricals(coord_a, coord_b):
+							assignWeight(a,b)
+
+			def getPivotOffset():
+				max_a = -float("inf")
+				max_b = -float("inf")
+				axes = tuple(i for i in range(3) if i != axis_index)
+				for vert in data.vertices:
+					vert_coords = vert.co
+					if vert_coords[0] > max_a:
+						max_a = vert_coords[0]
+					if vert_coords[1] > max_b:
+						max_b = vert_coords[1]
+
+				result = [max_a,max_b]
+				result.insert(axis_index, 0)
+
+				return Vector(result)
+
+			def movePivot(offset):
+				for vertex in data.vertices:
+					vertex.co -= offset
+
+				active_obj.location += vectorMultiply(offset, active_obj.scale)
+
+			pivot_offset = getPivotOffset()
+			movePivot(pivot_offset)
+
+			vec_distrib = dict()
+
+			# vector_step = 0.00001 #resolution
+			res = 2**self.resolution  # resolution
+			# grouping by position vector lengths
+			for vert in data.vertices:
+				vert_coords = vert.co.to_tuple()
+				l = vectorLength(vert.co, return_square=True)
+				# key = round(l/vector_step)
+				key = round(l*res)
+				group_index = 0 if vert_coords[axis_index] < 0 else 1#positive or negative
+				# print(vert_coords[axis_index], group_index)#debug
+				vec_distrib.setdefault(key, ([], []))[group_index].append(vert.index)
+
+			temp = vec_distrib.copy()
+			for i, v in vec_distrib.copy().items():
+				negatives = v[0]
+				positives = v[1]
+
+				# perfectly distributed!
+				if len(negatives) == len(positives) == 1:
+					if self.negative:
+						assignWeight(negatives[0], positives[0])
 					else:
-						negatives.append(vert.index)
-				elif vert_coords[axis_index] > 0:
-					# weights are copied TO these
-					for n, other_vert_index in enumerate(negatives):
-						other_vert_coords = data.vertices[other_vert_index].co.to_tuple()
-						if symmetricals(other_vert_coords, vert_coords):
-							vert_weight = vertex_group.weight(other_vert_index)
-							vertex_group.add((vert.index,), vert_weight, "REPLACE")
-							negatives.pop(n)
-							break
+						assignWeight(positives[0], negatives[0])
+
+					del vec_distrib[i]
+
+				elif negatives and positives:
+					if self.negative:
+						searcher(negatives, positives)
 					else:
-						vertex_group.add((vert.index,), 0.0, "REPLACE")
-						positives.append(vert.index)
-			else:
-				# positive (from +X to -X)
-				if vert_coords[axis_index] > 0:
-					# weights are copied FROM these
-					try:
-						vert_weight = vertex_group.weight(vert.index)
-					except RuntimeError:
-						continue
-					# look for symmetrical vertex among saved ones
-					for n, other_vert_index in enumerate(negatives):
-						other_vert_coords = data.vertices[other_vert_index].co.to_tuple()
-						if symmetricals(other_vert_coords, vert_coords):
-							vertex_group.add((other_vert_index,), vert_weight, "REPLACE")
-							negatives.pop(n)
-							break
-					else:
-						positives.append(vert.index)
-				elif vert_coords[axis_index] < 0:
-					# weights are copied TO these
-					for n, other_vert_index in enumerate(positives):
-						other_vert_coords = data.vertices[other_vert_index].co.to_tuple()
-						if symmetricals(other_vert_coords, vert_coords):
-							vert_weight = vertex_group.weight(other_vert_index)
-							vertex_group.add((vert.index,), vert_weight, "REPLACE")
-							positives.pop(n)
-							break
-					else:
-						vertex_group.add((vert.index,), 0.0, "REPLACE")
-						negatives.append(vert.index)
+						searcher(positives, negatives)
+
+					del vec_distrib[i]
+
+			movePivot(-pivot_offset)
+
+
+			# print(vec_distrib)#debug
+			# print(set((len(vec_distrib[i][0]), len(vec_distrib[i][1]),) for i in vec_distrib))#debug
+			# print("old size:", len(temp), "new size:", len(vec_distrib))#debug
+
+		start_time = time()
+		if vertex_group:
+			if context.scene.weight_mirror_algorithm == "perebor":
+			# if False:
+				perebor()
+			elif context.scene.weight_mirror_algorithm == "vector_grouper":
+				vector_grouper()
+		else:
+			print("Object has no vertex groups!")
+			self.report({'ERROR'}, 'Object has no vertex groups!')
+
+		print("Time elapsed:", time()-start_time)
 
 		return {'FINISHED'}
 
@@ -369,7 +481,6 @@ class VIEW3D_OT_move_pivot(bpy.types.Operator):
 
 	def execute(self, context):  # execute() is called by blender when running the operator.
 		scene = context.scene
-		cursor = scene.cursor_location
 		obj = scene.objects.active
 		mesh = bpy.context.active_object.data
 
