@@ -75,20 +75,15 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 	bl_options = {'REGISTER', 'UNDO'}
 
 	axes_menu_items = (("x", "X", "", 0), ("y", "Y", "", 1), ("z", "Z", "", 2),)
-	# algorithms_menu_items = (("perebor", "Perebor", "", 0), ("vector_grouper", "Vector-grouper", "", 1),)
 
-	# algorithm = bpy.props.EnumProperty(items=algorithms_menu_items, name="Algorithm", description="")
-	resolution = bpy.props.IntProperty(name="Resolution",description="", min=1, default=14, max=30)
-	axis = bpy.props.EnumProperty(items=axes_menu_items, name="Axis", description="Axis of symmetry")
-	negative = bpy.props.BoolProperty(name="Negative", subtype="NONE",
-									  description="Copy from negative to positive side if checked. If unchecked - from positive to negative")
 	margin = bpy.props.FloatProperty(name="Margin", unit="LENGTH", subtype="NONE", soft_min=0, step=0.00001 * 100,
 									 description="The coordinate of a vertex will be checked in the interval with width of 2*margin. Needed to avoid precision problems. Should be left at default value most of the time.", default=0.00001, precision=6)
 
 	def execute(self, context):
 		active_obj = context.active_object
 		data = active_obj.data
-		axis_index = "xyz".index(self.axis)
+		axis_index = "xyz".index(context.scene.weight_mirror_axis)
+		negative = context.scene.weight_mirror_negative
 
 		# get active vertex group
 		vertex_group = active_obj.vertex_groups.active
@@ -112,7 +107,7 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 
 			for vert in data.vertices:
 				vert_coords = vert.co.to_tuple()
-				if self.negative:
+				if negative:
 					# negative (from -X to +X)
 					if vert_coords[axis_index] < 0:
 						# weights are copied FROM these
@@ -214,17 +209,17 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 
 					return Vector(result)
 				else:
-					preset[axis_index] = 0
-					return preset
+					result = preset.copy()
+					result[axis_index] = 0
+					return result
 
 			pivot_offset = getPivotOffset()
 
 			verts = data.vertices
 			verts_len = len(verts)
 			verts_len_old = float("inf")
-			res = 2**self.resolution  # resolution
+			resolution = 2**context.scene.weight_mirror_resolution  # resolution
 			print("len(verts)",len(tuple(verts)))#debug
-
 
 			while verts_len and verts_len < verts_len_old:
 				print("pivot_offset",pivot_offset)#debug
@@ -233,13 +228,9 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 				for vert in verts:
 					vert_coords = vert.co.to_tuple()
 					l = vectorLength(vert.co, pivot_offset, return_square=True)
-					# key = round(l/vector_step)
-					key = round(l*res)
+					key = round(l*resolution)
 					group_index = 0 if vert_coords[axis_index] < 0 else 1  # positive or negative
-					# print(vert_coords[axis_index], group_index)#debug
 					vec_distrib.setdefault(key, ([], []))[group_index].append(vert.index)
-
-				temp = vec_distrib.copy()#debug
 
 				for i, v in vec_distrib.copy().items():
 					negatives = v[0]
@@ -247,7 +238,7 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 
 					# perfectly distributed!
 					if len(negatives) == len(positives) == 1:
-						if self.negative:
+						if negative:
 							assignWeight(negatives[0], positives[0])
 						else:
 							assignWeight(positives[0], negatives[0])
@@ -259,17 +250,8 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 						# a vert in 0
 						if abs(data.vertices[(negatives + positives)[0]].co[axis_index]) < self.margin:
 							# just skip it
-							pass
 							del vec_distrib[i]
 
-					# elif negatives and positives:
-					# 	if self.negative:
-					# 		searcher(negatives, positives)
-					# 	else:
-					# 		searcher(positives, negatives)
-					#
-					# 	del vec_distrib[i]
-				pass
 				verts = tuple(data.vertices[i] for i in itertools.chain.from_iterable(itertools.chain.from_iterable(vec_distrib.values())))
 				verts_len_old = verts_len
 				verts_len = len(verts)
@@ -278,17 +260,15 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 				except IndexError:
 					# end. All verts are arranged!
 					pass
-				print("verts_len", verts_len)#debug
+				print("Iteration complete. Remaining vertices:", verts_len)
 
 				# print("vec_distrib",vec_distrib)#debug
 				# print(set((len(vec_distrib[i][0]), len(vec_distrib[i][1]),) for i in vec_distrib))#debug
-				# print("old size:", len(temp), "new size:", len(vec_distrib))#debug
 				# print(list(itertools.chain.from_iterable(itertools.chain.from_iterable(vec_distrib.values()))))#debug
 
 		start_time = time()
 		if vertex_group:
 			if context.scene.weight_mirror_algorithm == "perebor":
-			# if False:
 				perebor_algorithm()
 			elif context.scene.weight_mirror_algorithm == "vector_grouper":
 				vector_grouper_algorithm()

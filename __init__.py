@@ -5,7 +5,7 @@
 bl_info = {
 "name": "Omni-Tools",
 "author": "Highstaker a.k.a. Omni H. Sable",
-"version": (1, 2, 1),
+"version": (1, 2, 2),
 "blender": (2, 74, 0),
 "location": "View3D > Tool Shelf > Omni-Tools Tab",
 "description": "A set of my tools to boost the workflow",
@@ -32,10 +32,15 @@ import bpy
 from bpy.props import *
 
 PROCESSES = 4
-bpy.types.Scene.processes = IntProperty(name="Processes", description="", min=PROCESSES, )
+bpy.types.Scene.omnitools_processes = IntProperty(name="Processes", description="", min=PROCESSES, )
 
-algorithms_menu_items = (("perebor", "Perebor", "", 0), ("vector_grouper", "Vector-grouper", "", 1),)
+algorithms_menu_items = (("vector_grouper", "Vector-grouper", "", 1), ("perebor", "Perebor", "", 0))
+axes_menu_items = (("x", "X", "", 0), ("y", "Y", "", 1), ("z", "Z", "", 2),)
 bpy.types.Scene.weight_mirror_algorithm = bpy.props.EnumProperty(items=algorithms_menu_items, name="Algorithm", description="")
+bpy.types.Scene.weight_mirror_resolution = bpy.props.FloatProperty(name="Resolution",description="", min=1, default=14, max=30)
+bpy.types.Scene.weight_mirror_axis = bpy.props.EnumProperty(items=axes_menu_items, name="Axis", description="Axis of symmetry")
+bpy.types.Scene.weight_mirror_negative = bpy.props.BoolProperty(name="Negative", subtype="NONE",
+								  description="Select vertices on negative side of symmetry axis. If unchecked - on positive.")
 
 
 # main class of this toolbar
@@ -89,8 +94,9 @@ class VIEW3D_PT_OmniTools(bpy.types.Panel):
 		col = layout.column(align=True)
 		col.operator("view3d.mirror_weights",text="Mirror Weights")
 		col.prop(data=context.scene, property='weight_mirror_algorithm')
-
-
+		col.prop(data=context.scene, property='weight_mirror_axis')
+		col.prop(data=context.scene, property='weight_mirror_negative')
+		col.prop(data=context.scene, property='weight_mirror_resolution')
 
 
 ################
