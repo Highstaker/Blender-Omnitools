@@ -5,7 +5,7 @@
 bl_info = {
 "name": "Omni-Tools",
 "author": "Highstaker a.k.a. Omni H. Sable",
-"version": (1, 2, 0),
+"version": (1, 2, 1),
 "blender": (2, 74, 0),
 "location": "View3D > Tool Shelf > Omni-Tools Tab",
 "description": "A set of my tools to boost the workflow",

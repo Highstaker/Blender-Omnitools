@@ -2,13 +2,28 @@ import bpy
 from mathutils import Vector
 import math
 
+
 def vectorMultiply(a,b):
 	"""
 	Multiplies elements of `a` with the respective elements of `b`
 	"""
 	return Vector(x * y for x, y in zip(a, b))
 
-def vectorLength(vert, return_square=False):
+
+def vectorLength(vert1, vert2, return_square=False):
+	"""
+	Returns the length of a vector from (0,0,0) to the given vertex (position vector)
+	:param return_square: If true, doesn't calculate root, returns a square of vector length. Obviously makes it faster.
+	:param vert: coordinates, as Vector or sequence of (x,y,z)
+	:return: length of position vector
+	"""
+	result = (vert2[0]-vert1[0])**2 + (vert2[1]-vert1[1])**2 + (vert2[2]-vert1[2])**2
+	if not return_square:
+		result = math.sqrt(result)
+	return result
+
+
+def radiusVectorLength(vert, return_square=False):
 	"""
 	Returns the length of a vector from (0,0,0) to the given vertex (position vector)
 	:param return_square: If true, doesn't calculate root, returns a square of vector length. Obviously makes it faster.

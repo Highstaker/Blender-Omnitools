@@ -1,6 +1,7 @@
 import bpy
 import os
 import random
+import itertools
 from time import time
 
 from mathutils import Vector
@@ -67,9 +68,8 @@ class VIEW3D_OT_this_material_select(bpy.types.Operator):
 
 		return {'FINISHED'}
 
-#works
 class VIEW3D_OT_mirror_weights(bpy.types.Operator):
-	bl_label = "Select Half"
+	bl_label = "Mirror weights"
 	bl_idname = "view3d.mirror_weights"
 	bl_description = "Mirror weights from one half to another"
 	bl_options = {'REGISTER', 'UNDO'}
@@ -78,7 +78,7 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 	# algorithms_menu_items = (("perebor", "Perebor", "", 0), ("vector_grouper", "Vector-grouper", "", 1),)
 
 	# algorithm = bpy.props.EnumProperty(items=algorithms_menu_items, name="Algorithm", description="")
-	resolution = bpy.props.IntProperty(name="Resolution",description="", min=1, default=19, max=30)
+	resolution = bpy.props.IntProperty(name="Resolution",description="", min=1, default=14, max=30)
 	axis = bpy.props.EnumProperty(items=axes_menu_items, name="Axis", description="Axis of symmetry")
 	negative = bpy.props.BoolProperty(name="Negative", subtype="NONE",
 									  description="Copy from negative to positive side if checked. If unchecked - from positive to negative")
@@ -106,7 +106,7 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 
 			return all(result)
 
-		def perebor():
+		def perebor_algorithm():
 			positives = []
 			negatives = []
 
@@ -171,7 +171,7 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 							vertex_group.add((vert.index,), 0.0, "REPLACE")
 							negatives.append(vert.index)
 
-		def vector_grouper():
+		def vector_grouper_algorithm():
 			def assignWeight(a,b):
 				"""
 				Assigns a weight from a to b. If a has no weight data, assigns 0 to b.
@@ -197,81 +197,101 @@ class VIEW3D_OT_mirror_weights(bpy.types.Operator):
 						if symmetricals(coord_a, coord_b):
 							assignWeight(a,b)
 
-			def getPivotOffset():
-				max_a = -float("inf")
-				max_b = -float("inf")
+			def getPivotOffset(preset=None):
 				axes = tuple(i for i in range(3) if i != axis_index)
-				for vert in data.vertices:
-					vert_coords = vert.co
-					if vert_coords[0] > max_a:
-						max_a = vert_coords[0]
-					if vert_coords[1] > max_b:
-						max_b = vert_coords[1]
+				if not preset:
+					max_a = -float("inf")
+					max_b = -float("inf")
+					for vert in data.vertices:
+						vert_coords = vert.co
+						if vert_coords[axes[0]] > max_a:
+							max_a = vert_coords[axes[0]]
+						if vert_coords[axes[1]] > max_b:
+							max_b = vert_coords[axes[1]]
 
-				result = [max_a,max_b]
-				result.insert(axis_index, 0)
+					result = [max_a, max_b]
+					result.insert(axis_index, 0)
 
-				return Vector(result)
-
-			def movePivot(offset):
-				for vertex in data.vertices:
-					vertex.co -= offset
-
-				active_obj.location += vectorMultiply(offset, active_obj.scale)
+					return Vector(result)
+				else:
+					preset[axis_index] = 0
+					return preset
 
 			pivot_offset = getPivotOffset()
-			movePivot(pivot_offset)
 
-			vec_distrib = dict()
-
-			# vector_step = 0.00001 #resolution
+			verts = data.vertices
+			verts_len = len(verts)
+			verts_len_old = float("inf")
 			res = 2**self.resolution  # resolution
-			# grouping by position vector lengths
-			for vert in data.vertices:
-				vert_coords = vert.co.to_tuple()
-				l = vectorLength(vert.co, return_square=True)
-				# key = round(l/vector_step)
-				key = round(l*res)
-				group_index = 0 if vert_coords[axis_index] < 0 else 1#positive or negative
-				# print(vert_coords[axis_index], group_index)#debug
-				vec_distrib.setdefault(key, ([], []))[group_index].append(vert.index)
-
-			temp = vec_distrib.copy()
-			for i, v in vec_distrib.copy().items():
-				negatives = v[0]
-				positives = v[1]
-
-				# perfectly distributed!
-				if len(negatives) == len(positives) == 1:
-					if self.negative:
-						assignWeight(negatives[0], positives[0])
-					else:
-						assignWeight(positives[0], negatives[0])
-
-					del vec_distrib[i]
-
-				elif negatives and positives:
-					if self.negative:
-						searcher(negatives, positives)
-					else:
-						searcher(positives, negatives)
-
-					del vec_distrib[i]
-
-			movePivot(-pivot_offset)
+			print("len(verts)",len(tuple(verts)))#debug
 
 
-			# print(vec_distrib)#debug
-			# print(set((len(vec_distrib[i][0]), len(vec_distrib[i][1]),) for i in vec_distrib))#debug
-			# print("old size:", len(temp), "new size:", len(vec_distrib))#debug
+			while verts_len and verts_len < verts_len_old:
+				print("pivot_offset",pivot_offset)#debug
+				# grouping by position vector lengths
+				vec_distrib = dict()
+				for vert in verts:
+					vert_coords = vert.co.to_tuple()
+					l = vectorLength(vert.co, pivot_offset, return_square=True)
+					# key = round(l/vector_step)
+					key = round(l*res)
+					group_index = 0 if vert_coords[axis_index] < 0 else 1  # positive or negative
+					# print(vert_coords[axis_index], group_index)#debug
+					vec_distrib.setdefault(key, ([], []))[group_index].append(vert.index)
+
+				temp = vec_distrib.copy()#debug
+
+				for i, v in vec_distrib.copy().items():
+					negatives = v[0]
+					positives = v[1]
+
+					# perfectly distributed!
+					if len(negatives) == len(positives) == 1:
+						if self.negative:
+							assignWeight(negatives[0], positives[0])
+						else:
+							assignWeight(positives[0], negatives[0])
+
+						del vec_distrib[i]
+
+					# it is either a vertex with x==0, or a vertex that accidentally fell out.
+					elif (len(negatives) == 1 and len(positives) == 0) or (len(negatives) == 0 and len(positives) == 1):
+						# a vert in 0
+						if abs(data.vertices[(negatives + positives)[0]].co[axis_index]) < self.margin:
+							# just skip it
+							pass
+							del vec_distrib[i]
+
+					# elif negatives and positives:
+					# 	if self.negative:
+					# 		searcher(negatives, positives)
+					# 	else:
+					# 		searcher(positives, negatives)
+					#
+					# 	del vec_distrib[i]
+				pass
+				verts = tuple(data.vertices[i] for i in itertools.chain.from_iterable(itertools.chain.from_iterable(vec_distrib.values())))
+				verts_len_old = verts_len
+				verts_len = len(verts)
+				try:
+					pivot_offset = getPivotOffset(preset=verts[0].co)
+				except IndexError:
+					# end. All verts are arranged!
+					pass
+				print("verts_len", verts_len)#debug
+
+				# print("vec_distrib",vec_distrib)#debug
+				# print(set((len(vec_distrib[i][0]), len(vec_distrib[i][1]),) for i in vec_distrib))#debug
+				# print("old size:", len(temp), "new size:", len(vec_distrib))#debug
+				# print(list(itertools.chain.from_iterable(itertools.chain.from_iterable(vec_distrib.values()))))#debug
 
 		start_time = time()
 		if vertex_group:
 			if context.scene.weight_mirror_algorithm == "perebor":
 			# if False:
-				perebor()
+				perebor_algorithm()
 			elif context.scene.weight_mirror_algorithm == "vector_grouper":
-				vector_grouper()
+				vector_grouper_algorithm()
 		else:
 			print("Object has no vertex groups!")
 			self.report({'ERROR'}, 'Object has no vertex groups!')
